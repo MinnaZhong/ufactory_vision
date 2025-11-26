@@ -98,9 +98,9 @@ class TorchGGCNN(object):
                 self.ggcnn_cmd_que.put([robot_pos, result])
     
     def get_grasp_img(self, depth_image, depth_cam_k, robot_z):
-        crop_size = 300
+        crop_size = min(min(depth_image.shape[0], depth_image.shape[1]), 500)
         crop_y_offset = 0
-        out_size = 300
+        out_size = crop_size
 
         fx = depth_cam_k[0][0]
         fy = depth_cam_k[1][1]

@@ -18,9 +18,13 @@ MODEL_FILE = 'models/ggcnn_epoch_23_cornell'    # GGCNN
 OPEN_LOOP_HEIGHT = 340 # mm
 GGCNN_IN_THREAD = False
 
+# show the grasp image of ggcnn or not, otherwise show native depth images.
+SHOW_GRASP_IMG = False
+
 # rgb camera calibration result
 EULER_EEF_TO_COLOR_OPT = [0.067052239, -0.0311387575, 0.021611456, -0.004202176, -0.00848499, 1.5898775] # xyzrpy meters_rad
-EULER_COLOR_TO_DEPTH_OPT = [0.015, 0, 0, 0, 0, 0]
+# EULER_COLOR_TO_DEPTH_OPT = [0.015, 0, 0, 0, 0, 0]
+EULER_COLOR_TO_DEPTH_OPT = [0, 0, 0, 0, 0, 0]
 
 # The range of motion of the robot grasping
 # If it exceeds the range, it will return to the initial detection position.
@@ -83,18 +87,30 @@ def main():
     }
     grasp = RobotGrasp(robot_ip, ggcnn_cmd_que, euler_opt, grasp_config)
 
+    crop_size = 300
+    crop_y_offset = 0
+
+    crop_y_inx = -1
+    crop_x_inx = -1
+
     while grasp.is_alive():
-        color_image, depth_image = camera.get_images()
+        color_image, depth_image = camera.get_images(align=True)
+
+        if crop_y_inx < 0:
+            imh, imw = depth_image.shape
+            crop_y_inx = max(0, imh - crop_size) // 2 - crop_y_offset   # crop height(y) start index
+            crop_x_inx = max(0, imw - crop_size) // 2                   # crop width(x) start index
+
         robot_pos = grasp.get_eef_pose_m()
         if GGCNN_IN_THREAD:
             if not depth_img_que.empty():
                 depth_img_que.get()
             depth_img_que.put([robot_pos, depth_image])
-            if ggcnn.grasp_img is not None:
-                combined_img = get_combined_img(color_image, ggcnn.grasp_img)
-                cv2.imshow(WIN_NAME, combined_img)
-            else:
-                cv2.imshow(WIN_NAME, color_image) # 显示彩色图像
+            if not SHOW_GRASP_IMG or grasp_img is None:
+                grasp_img = depth_image[crop_y_inx:crop_y_inx + crop_size, crop_x_inx:crop_x_inx + crop_size]
+
+            combined_img = get_combined_img(color_image, ggcnn.grasp_img)
+            cv2.imshow(WIN_NAME, combined_img)
         else:
             grasp_img, result = ggcnn.get_grasp_img(depth_image, DEPTH_CAM_K, robot_pos[2])
             if result:
@@ -102,9 +118,12 @@ def main():
                     ggcnn_cmd_que.get()
                 ggcnn_cmd_que.put([robot_pos, result])
 
+            if not SHOW_GRASP_IMG or grasp_img is None:
+                grasp_img = depth_image[crop_y_inx:crop_y_inx + crop_size, crop_x_inx:crop_x_inx + crop_size]
+
             combined_img = get_combined_img(color_image, grasp_img)
             cv2.imshow(WIN_NAME, combined_img)
-        
+
         key = cv2.waitKey(1)
         # Press esc or 'q' to close the image window
         if key & 0xFF == ord('q') or key == 27:

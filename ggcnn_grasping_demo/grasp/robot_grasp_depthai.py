@@ -151,6 +151,7 @@ class RobotGrasp(object):
         if self.detect_steps not in [1, 2, 3]:
             self.detect_steps = 3
         self.use_vacuum_gripper = grasp_config.get('USE_VACUUM_GRIPPER', False)
+        self.min_result_z = grasp_config.get('MIN_RESULT_Z_MM', 200) / 1000
         # self.pose_averager = Averager(4, 3)
         self.pose_averager = MinPos(4, 3)
         self.ready_check = False
@@ -184,6 +185,8 @@ class RobotGrasp(object):
         self.arm.set_position(x=self.detect_xyz[0], y=self.detect_xyz[1], z=self.detect_xyz[2], roll=180, pitch=0, yaw=0, wait=True)
         time.sleep(0.5)
 
+        if not self.use_vacuum_gripper:
+            self.arm.set_gripper_enable(True)
         self.place()
 
         time.sleep(0.5)
@@ -230,7 +233,7 @@ class RobotGrasp(object):
                 and abs(abs(roll)-180) < 2 and abs(pitch) < 2 and abs(yaw) < 2:
                 self.last_grasp_time = time.monotonic()
                 return
-            print('[STOP] MOVE TO INITIAL DETECT POSINT, CURR_POS={}, last_grasp_time={}'.format(self.CURR_POS, self.last_grasp_time))
+            print('[STOP] MOVE TO INITIAL DETECT POINT, CURR_POS={}, last_grasp_time={}'.format(self.CURR_POS, self.last_grasp_time))
             self.ready_grasp = False
             self.arm.set_state(4)
             time.sleep(1)
@@ -344,7 +347,7 @@ class RobotGrasp(object):
         # PBVS Method.
         # euler_base_to_eef = self.get_eef_pose_m()
 
-        if d[2] > 0.2:  # Min effective range of the realsense.
+        if d[2] > self.min_result_z:  # Min effective range of the realsense.
             gp = [d[0], d[1], d[2], 0, 0, -1 * d[3]] # xyzrpy in meter
 
             # Calculate Pose of Grasp in Robot Base Link Frame

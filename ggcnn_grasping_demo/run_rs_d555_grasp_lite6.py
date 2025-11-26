@@ -10,7 +10,7 @@ from queue import Queue
 
 WIN_NAME = 'RealSense'
 CAM_WIDTH = 640
-CAM_HEIGHT = 480
+CAM_HEIGHT = 360
 
 MODEL_FILE = 'models/ggcnn_epoch_23_cornell'    # GGCNN
 # MODEL_FILE = 'models/epoch_50_cornell'          # GGCNN2
@@ -22,35 +22,29 @@ GGCNN_IN_THREAD = False
 SHOW_GRASP_IMG = False
 
 # rgb camera calibration result
-EULER_EEF_TO_COLOR_OPT = [0.067052239, -0.0311387575, 0.021611456, -0.004202176, -0.00848499, 1.5898775] # xyzrpy meters_rad
-# EULER_COLOR_TO_DEPTH_OPT = [0.015, 0, 0, 0, 0, 0]
+EULER_EEF_TO_COLOR_OPT = [0.07764864224079916, 0.010550201834757408, 0.03750506273479976, -0.026547330331239637, -0.014472415303380528, 1.5669058695753415] # xyzrpy meters_rad
+# EULER_COLOR_TO_DEPTH_OPT = [-0.05897061, 0.00015224, 0.00080319, -0.00046132, 0.00253145, -0.00295294]
 EULER_COLOR_TO_DEPTH_OPT = [0, 0, 0, 0, 0, 0]
 
 # The range of motion of the robot grasping
 # If it exceeds the range, it will return to the initial detection position.
-GRASPING_RANGE = [180, 600, -200, 200] # [x_min, x_max, y_min, y_max]
+GRASPING_RANGE = [180, 380, -200, 200] # [x_min, x_max, y_min, y_max]
 
 # initial detection position
-DETECT_XYZ = [300, 0, 400] # [x, y, z]
+DETECT_XYZ = [200, 0, 320] # [x, y, z]
 
 # release grasping pos
-RELEASE_XYZ = [400, 400, 270]
+RELEASE_XYZ = [200, 200, 200]
 
 # lift offset based on DETECT_XYZ[2] after grasping or release
-LIFT_OFFSET_Z = 100 # lift_height = DETECT_XYZ[2] + LIFT_OFFSET_Z
+LIFT_OFFSET_Z = 0 # lift_height = DETECT_XYZ[2] + LIFT_OFFSET_Z
 
 # The distance between the gripping point of the robot grasping and the end of the robot arm flange
 # The value needs to be fine-tuned according to the actual situation.
-GRIPPER_Z_MM = 150 # mm
+GRIPPER_Z_MM = 70 # mm
 
 # minimum z for grasping
-GRASPING_MIN_Z = 175 # mm
-
-# DEPTH_CAM_K = np.array([
-#     [fx, 0, cx],
-#     [0, fy, cy],
-#     [0, 0, 1]
-# ])
+GRASPING_MIN_Z = 70 # mm
 
 
 def main():
@@ -89,6 +83,8 @@ def main():
         'LIFT_OFFSET_Z': LIFT_OFFSET_Z,
         'GRIPPER_Z_MM': GRIPPER_Z_MM,
         'GRASPING_MIN_Z': GRASPING_MIN_Z,
+        'USE_VACUUM_GRIPPER': True,
+        'MIN_RESULT_Z_MM': 250,
     }
     grasp = RobotGrasp(robot_ip, ggcnn_cmd_que, euler_opt, grasp_config)
 
@@ -111,7 +107,6 @@ def main():
             if not depth_img_que.empty():
                 depth_img_que.get()
             depth_img_que.put([robot_pos, depth_image])
-            grasp_img = ggcnn.grasp_img
             if not SHOW_GRASP_IMG or grasp_img is None:
                 grasp_img = depth_image[crop_y_inx:crop_y_inx + crop_size, crop_x_inx:crop_x_inx + crop_size]
 

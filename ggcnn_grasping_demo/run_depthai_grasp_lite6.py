@@ -11,7 +11,7 @@ from queue import Queue
 WIN_NAME = 'DEPTHAI'
 CAM_WIDTH = 640
 CAM_HEIGHT = 400
-DISABLE_RGB = True
+DISABLE_RGB = False
 
 MODEL_FILE = 'models/ggcnn_epoch_23_cornell'    # GGCNN
 # MODEL_FILE = 'models/epoch_50_cornell'          # GGCNN2
@@ -19,9 +19,14 @@ MODEL_FILE = 'models/ggcnn_epoch_23_cornell'    # GGCNN
 OPEN_LOOP_HEIGHT = 500 # mm
 GGCNN_IN_THREAD = False
 
+# show the grasp image of ggcnn or not, otherwise show native depth images.
+SHOW_GRASP_IMG = False
+
 # EULER_EEF_TO_COLOR_OPT = [0.075, 0, 0.021611456, 0, 0, 1.5708] # xyzrpy meters_rad
 EULER_EEF_TO_COLOR_OPT = [0.0703, 0.0023, 0.0195, 0, 0, 1.579] # xyzrpy meters_rad
-EULER_COLOR_TO_DEPTH_OPT = [0.0375, 0, 0, 0, 0, 0]
+# EULER_COLOR_TO_DEPTH_OPT = [0.0375, 0, 0, 0, 0, 0]
+# depth is aligned to color, so no extrinsic needed
+EULER_COLOR_TO_DEPTH_OPT = [0.0, 0, 0, 0, 0, 0]
 
 # The range of motion of the robot grasping
 # If it exceeds the range, it will return to the initial detection position.
@@ -60,12 +65,15 @@ def main():
     ggcnn_cmd_que = Queue(1)
     
     camera = DepthAiCamera(width=CAM_WIDTH, height=CAM_HEIGHT, disable_rgb=DISABLE_RGB)
-    _, depth_intrin = camera.get_intrinsics()
+
+    # _, depth_intrin = camera.get_intrinsics(width=CAM_WIDTH, height=CAM_HEIGHT)
+    color_intrin, depth_intrin = camera.get_intrinsics()
+
     ggcnn_config = {
         'MODEL_FILE': MODEL_FILE,
         'OPEN_LOOP_HEIGHT': OPEN_LOOP_HEIGHT,
         'GGCNN_IN_THREAD': GGCNN_IN_THREAD,
-        'DEPTH_CAM_K': depth_intrin,
+        'DEPTH_CAM_K': color_intrin, # depth is aligned to color, use color intrinsics
     }
     ggcnn = TorchGGCNN(ggcnn_config, depth_img_que, ggcnn_cmd_que)
     time.sleep(2)
@@ -87,24 +95,38 @@ def main():
     }
     grasp = RobotGrasp(robot_ip, ggcnn_cmd_que, euler_opt, grasp_config)
 
+    crop_size = 300
+    crop_y_offset = 0
+
+    crop_y_inx = -1
+    crop_x_inx = -1
+
     while grasp.is_alive():
         color_image, depth_image = camera.get_images()
+
+        if crop_y_inx < 0:
+            imh, imw = depth_image.shape
+            crop_size = min(imh, imw)
+            crop_y_inx = max(0, imh - crop_size) // 2 - crop_y_offset   # crop height(y) start index
+            crop_x_inx = max(0, imw - crop_size) // 2                   # crop width(x) start index
+
+        if color_image is not None:
+            color_image = color_image[crop_y_inx:crop_y_inx + crop_size, crop_x_inx:crop_x_inx + crop_size, :]
+
         robot_pos = grasp.get_eef_pose_m()
         if GGCNN_IN_THREAD:
             if not depth_img_que.empty():
                 depth_img_que.get()
             depth_img_que.put([robot_pos, depth_image])
-            if ggcnn.grasp_img is not None:
-                if DISABLE_RGB:
-                    combined_img = get_combined_img(depth_image, ggcnn.grasp_img)
-                else:
-                    combined_img = get_combined_img(color_image, ggcnn.grasp_img)
-                cv2.imshow(WIN_NAME, combined_img)
+            grasp_img = ggcnn.grasp_img
+            depth_image = depth_image[crop_y_inx:crop_y_inx + crop_size, crop_x_inx:crop_x_inx + crop_size]
+            if not SHOW_GRASP_IMG or grasp_img is None:
+                grasp_img = depth_image
+            if color_image is None:
+                combined_img = get_combined_img(depth_image, grasp_img)
             else:
-                if DISABLE_RGB:
-                    cv2.imshow(WIN_NAME, depth_image) # 显示深度图像
-                else:
-                    cv2.imshow(WIN_NAME, color_image) # 显示彩色图像
+                combined_img = get_combined_img(color_image, grasp_img)
+            cv2.imshow(WIN_NAME, combined_img)
         else:
             grasp_img, result = ggcnn.get_grasp_img(depth_image, depth_intrin, robot_pos[2])
             if result:
@@ -112,12 +134,16 @@ def main():
                     ggcnn_cmd_que.get()
                 ggcnn_cmd_que.put([robot_pos, result])
 
-            if DISABLE_RGB:
+            depth_image = depth_image[crop_y_inx:crop_y_inx + crop_size, crop_x_inx:crop_x_inx + crop_size]
+            if not SHOW_GRASP_IMG or grasp_img is None:
+                grasp_img = depth_image
+
+            if color_image is None:
                 combined_img = get_combined_img(depth_image, grasp_img)
             else:
                 combined_img = get_combined_img(color_image, grasp_img)
             cv2.imshow(WIN_NAME, combined_img)
-        
+
         key = cv2.waitKey(1)
         # Press esc or 'q' to close the image window
         if key & 0xFF == ord('q') or key == 27:
