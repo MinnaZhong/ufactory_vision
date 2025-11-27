@@ -1,14 +1,17 @@
+import os
 import sys
 import cv2
 import time
 import numpy as np
+from queue import Queue
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from camera.rs_camera import RealSenseCamera
 from camera.utils import get_combined_img
 from grasp.ggcnn_torch import TorchGGCNN
 from grasp.robot_grasp import RobotGrasp
-from queue import Queue
 
-WIN_NAME = 'RealSense'
+WIN_NAME = 'RealSense-D555'
 CAM_WIDTH = 640
 CAM_HEIGHT = 360
 

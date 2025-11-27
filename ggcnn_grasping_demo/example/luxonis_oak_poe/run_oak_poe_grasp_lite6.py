@@ -1,14 +1,16 @@
+import os
 import sys
 import cv2
 import time
-import numpy as np
+from queue import Queue
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from camera.depthai_camera import DepthAiCamera
 from camera.utils import get_combined_img
 from grasp.ggcnn_torch import TorchGGCNN
 from grasp.robot_grasp_depthai import RobotGrasp
-from queue import Queue
 
-WIN_NAME = 'DEPTHAI'
+WIN_NAME = 'OAK-POE'
 CAM_WIDTH = 640
 CAM_HEIGHT = 400
 DISABLE_RGB = False
@@ -30,23 +32,23 @@ EULER_COLOR_TO_DEPTH_OPT = [0.0, 0, 0, 0, 0, 0]
 
 # The range of motion of the robot grasping
 # If it exceeds the range, it will return to the initial detection position.
-GRASPING_RANGE = [180, 600, -200, 200] # [x_min, x_max, y_min, y_max]
+GRASPING_RANGE = [180, 380, -200, 200] # [x_min, x_max, y_min, y_max]
 
 # initial detection position
-DETECT_XYZ = [300, 0, 400] # [x, y, z]
+DETECT_XYZ = [200, 0, 350] # [x, y, z]
 
 # release grasping pos
-RELEASE_XYZ = [400, 400, 270]
+RELEASE_XYZ = [200, 200, 200]
 
 # lift offset based on DETECT_XYZ[2] after grasping or release
-LIFT_OFFSET_Z = 100 # lift_height = DETECT_XYZ[2] + LIFT_OFFSET_Z
+LIFT_OFFSET_Z = 0 # lift_height = DETECT_XYZ[2] + LIFT_OFFSET_Z
 
 # The distance between the gripping point of the robot grasping and the end of the robot arm flange
 # The value needs to be fine-tuned according to the actual situation.
-GRIPPER_Z_MM = 150 # mm
+GRIPPER_Z_MM = 50 # mm
 
 # minimum z for grasping
-GRASPING_MIN_Z = 175 # mm
+GRASPING_MIN_Z = 70 # mm
 
 MOVE_SPEED = 200
 MOVE_ACC = 1000
@@ -89,6 +91,7 @@ def main():
         'GRIPPER_Z_MM': GRIPPER_Z_MM,
         'GRASPING_MIN_Z': GRASPING_MIN_Z,
         'DETECT_STEPS': DETECT_STEPS,
+        'USE_VACUUM_GRIPPER': True,
         'MOVE_SPEED': MOVE_SPEED,
         'MOVE_ACC': MOVE_ACC,
     }

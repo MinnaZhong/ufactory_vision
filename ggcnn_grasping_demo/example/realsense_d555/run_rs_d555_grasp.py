@@ -1,16 +1,20 @@
+import os
 import sys
 import cv2
 import time
 import numpy as np
+from queue import Queue
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from camera.rs_camera import RealSenseCamera
 from camera.utils import get_combined_img
 from grasp.ggcnn_torch import TorchGGCNN
 from grasp.robot_grasp import RobotGrasp
-from queue import Queue
 
-WIN_NAME = 'RealSense'
+
+WIN_NAME = 'RealSense-D555'
 CAM_WIDTH = 640
-CAM_HEIGHT = 480
+CAM_HEIGHT = 360
 
 MODEL_FILE = 'models/ggcnn_epoch_23_cornell'    # GGCNN
 # MODEL_FILE = 'models/epoch_50_cornell'          # GGCNN2
@@ -22,8 +26,8 @@ GGCNN_IN_THREAD = False
 SHOW_GRASP_IMG = False
 
 # rgb camera calibration result
-EULER_EEF_TO_COLOR_OPT = [0.067052239, -0.0311387575, 0.021611456, -0.004202176, -0.00848499, 1.5898775] # xyzrpy meters_rad
-# EULER_COLOR_TO_DEPTH_OPT = [0.015, 0, 0, 0, 0, 0]
+EULER_EEF_TO_COLOR_OPT = [0.07764864224079916, 0.010550201834757408, 0.03750506273479976, -0.026547330331239637, -0.014472415303380528, 1.5669058695753415] # xyzrpy meters_rad
+# EULER_COLOR_TO_DEPTH_OPT = [-0.05897061, 0.00015224, 0.00080319, -0.00046132, 0.00253145, -0.00295294]
 EULER_COLOR_TO_DEPTH_OPT = [0, 0, 0, 0, 0, 0]
 
 # The range of motion of the robot grasping
@@ -31,7 +35,7 @@ EULER_COLOR_TO_DEPTH_OPT = [0, 0, 0, 0, 0, 0]
 GRASPING_RANGE = [180, 600, -300, 300] # [x_min, x_max, y_min, y_max]
 
 # initial detection position
-DETECT_XYZ = [300, 0, 400] # [x, y, z]
+DETECT_XYZ = [300, 0, 420] # [x, y, z]
 
 # release grasping pos
 RELEASE_XYZ = [400, 400, 270]
@@ -119,8 +123,8 @@ def main():
             grasp_img = ggcnn.grasp_img
             if not SHOW_GRASP_IMG or grasp_img is None:
                 grasp_img = depth_image[crop_y_inx:crop_y_inx + crop_size, crop_x_inx:crop_x_inx + crop_size]
-
-            combined_img = get_combined_img(color_image, ggcnn.grasp_img)
+            
+            combined_img = get_combined_img(color_image, grasp_img)
             cv2.imshow(WIN_NAME, combined_img)
         else:
             grasp_img, result = ggcnn.get_grasp_img(depth_image, DEPTH_CAM_K, robot_pos[2])
@@ -134,7 +138,7 @@ def main():
 
             combined_img = get_combined_img(color_image, grasp_img)
             cv2.imshow(WIN_NAME, combined_img)
-        
+
         key = cv2.waitKey(1)
         # Press esc or 'q' to close the image window
         if key & 0xFF == ord('q') or key == 27:
