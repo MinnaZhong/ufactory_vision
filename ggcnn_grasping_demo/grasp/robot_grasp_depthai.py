@@ -434,7 +434,7 @@ class RobotGrasp(object):
             self.last_grasp_time = 0
             self.arm.set_position(x=pos[0], y=pos[1], z=self.CURR_POS[2],
                                   roll=pos[3], pitch=pos[4], yaw=pos[5], 
-                                  speed=self.move_speed, acc=self.move_acc, wait=True)
+                                  speed=50, acc=self.move_acc, wait=True)
             self.arm.set_position(z=pos[2], wait=True)
             self.grasp_pos.set_step(9)
             self.last_grasp_time = time.monotonic()
