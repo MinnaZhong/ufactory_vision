@@ -58,10 +58,11 @@ def main():
     ggcnn_cmd_que = Queue(1)
     
     camera = RealSenseCamera(width=CAM_WIDTH, height=CAM_HEIGHT)
-    _, depth_intrin = camera.get_intrinsics()
+    color_intrin, depth_intrin = camera.get_intrinsics()
+    # depth is aligned to color, use color intrinsics
     DEPTH_CAM_K = np.array([
-        [depth_intrin.fx, 0, depth_intrin.ppx],
-        [0, depth_intrin.fy, depth_intrin.ppy],
+        [color_intrin.fx, 0, color_intrin.ppx],
+        [0, color_intrin.fy, color_intrin.ppy],
         [0, 0, 1]
     ])
     ggcnn_config = {
@@ -98,8 +99,11 @@ def main():
 
         if crop_y_inx < 0:
             imh, imw = depth_image.shape
+            crop_size = min(imh, imw)
             crop_y_inx = max(0, imh - crop_size) // 2 - crop_y_offset   # crop height(y) start index
             crop_x_inx = max(0, imw - crop_size) // 2                   # crop width(x) start index
+
+        color_image = color_image[crop_y_inx:crop_y_inx + crop_size, crop_x_inx:crop_x_inx + crop_size, :]
 
         robot_pos = grasp.get_eef_pose_m()
         if GGCNN_IN_THREAD:

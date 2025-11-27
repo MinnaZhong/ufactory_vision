@@ -95,6 +95,9 @@ class RobotGrasp(object):
         self.arm = XArmAPI(robot_ip, report_type='real')
         self.ggcnn_cmd_que = ggcnn_cmd_que
         self.euler_eef_to_color_opt = euler_opt['EULER_EEF_TO_COLOR_OPT']
+        self.euler_eef_to_color_opt2 = self.euler_eef_to_color_opt.copy()
+        self.euler_eef_to_color_opt2[0] = 0
+        self.euler_eef_to_color_opt2[1] = 0
         self.euler_color_to_depth_opt = euler_opt['EULER_COLOR_TO_DEPTH_OPT']
         self.grasping_range = grasp_config['GRASPING_RANGE']
         self.detect_xyz = grasp_config['DETECT_XYZ']
@@ -106,6 +109,7 @@ class RobotGrasp(object):
         self.min_result_z = grasp_config.get('MIN_RESULT_Z_MM', 200) / 1000
         # self.pose_averager = Averager(4, 3)
         self.pose_averager = MinPos(4, 3)
+        self.pose_averager2 = MinPos(4, 3)
         self.ready_check = False
         self.ready_grasp = False
         self.alive = True
@@ -203,7 +207,11 @@ class RobotGrasp(object):
 
         # if abs(self.CURR_POS[0] - self.GOAL_POS[0]) < 5 and abs(self.CURR_POS[1] - self.GOAL_POS[1]) < 5 and abs(self.CURR_POS[5] - self.GOAL_POS[5]) < 5:
         if abs(self.CURR_POS[0] - self.GOAL_POS[0]) < 5 and abs(self.CURR_POS[1] - self.GOAL_POS[1]) < 5:
-            self.GRASP_STATUS = 1
+            if self.GRASP_STATUS == 0:
+                self.GRASP_STATUS = 1
+            elif self.GRASP_STATUS == 2:
+                self.GRASP_STATUS = 3
+                self.arm.set_position(*self.GOAL_POS, speed=50, acc=1000, wait=False)
 
         # Stop Conditions.
         if z < self.gripper_z_mm or z - 1 < self.GOAL_POS[2]:
@@ -270,19 +278,28 @@ class RobotGrasp(object):
             # Calculate Pose of Grasp in Robot Base Link Frame
             # Average over a few predicted poses to help combat noise.
             mat_depthOpt_in_base = euler2mat(euler_base_to_eef) * euler2mat(self.euler_eef_to_color_opt) * euler2mat(self.euler_color_to_depth_opt)
+            mat_depthOpt_in_base2 = euler2mat(euler_base_to_eef) * euler2mat(self.euler_eef_to_color_opt2) * euler2mat(self.euler_color_to_depth_opt)
             gp_base = convert_pose(gp, mat_depthOpt_in_base)
+            gp_base2 = convert_pose(gp, mat_depthOpt_in_base2)
 
             if gp_base[5] < -np.pi:
                 gp_base[5] += np.pi
             elif gp_base[5] > 0:
                 gp_base[5] -= np.pi
 
+            if gp_base2[5] < -np.pi:
+                gp_base2[5] += np.pi
+            elif gp_base2[5] > 0:
+                gp_base2[5] -= np.pi
+
             # Only really care about rotation about z (e[2]).
             # if gp_base[0] * 1000 < self.grasping_range[0] or gp_base[0] * 1000 > self.grasping_range[1] \
             #     or gp_base[1] * 1000 < self.grasping_range[2] or gp_base[1] * 1000 > self.grasping_range[3]:
             #     return
             av = self.pose_averager.update(np.array([gp_base[0], gp_base[1], gp_base[2], gp_base[5]]))
-
+            av2 = self.pose_averager2.update(np.array([gp_base2[0], gp_base2[1], gp_base2[2], gp_base2[5]]))
+            if self.GRASP_STATUS == 0:
+                av = av2
         else:
             # gp_base = geometry_msgs.msg.Pose()
             gp_base = [0] * 6
@@ -293,7 +310,7 @@ class RobotGrasp(object):
         gp_base = [av[0], av[0], av[0], np.pi, 0, ang]
 
         GOAL_POS = [av[0] * 1000, av[1] * 1000, av[2] * 1000 + self.gripper_z_mm, 180, 0, math.degrees(ang + np.pi)]
-        if GOAL_POS[2] < self.gripper_z_mm + 10:
+        if GOAL_POS[2] < self.gripper_z_mm - 10:
             # print('[IG]', GOAL_POS)
             return
         GOAL_POS[2] = max(GOAL_POS[2], self.grasping_min_z)
@@ -312,12 +329,13 @@ class RobotGrasp(object):
 
         if self.GRASP_STATUS == 0:
             self.GOAL_POS = GOAL_POS
-            self.arm.set_position(x=self.GOAL_POS[0], y=self.GOAL_POS[1], z=self.GOAL_POS[2] + 100,
+            z = max(self.GOAL_POS[2] + 100, 350)
+            self.arm.set_position(x=self.GOAL_POS[0], y=self.GOAL_POS[1], z=z,
                                   roll=self.GOAL_POS[3], pitch=self.GOAL_POS[4], yaw=self.GOAL_POS[5], 
                                   speed=100, acc=1000, wait=False)
-            # self.pose_averager.reset()
-            # self.pose_averager.update(av)
 
         elif self.GRASP_STATUS == 1:
+            z = max(self.GOAL_POS[2] + 100, 350)
             self.GOAL_POS = GOAL_POS
-            self.arm.set_position(*self.GOAL_POS, speed=50, acc=1000, wait=False)
+            self.arm.set_position(x=GOAL_POS[0], y=GOAL_POS[1], z=z, roll=GOAL_POS[3], pitch=GOAL_POS[4], yaw=GOAL_POS[5], speed=200, acc=1000, wait=False)
+            self.GRASP_STATUS = 2

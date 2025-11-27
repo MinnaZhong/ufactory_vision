@@ -1,9 +1,13 @@
+import math
 import cv2
 import numpy as np
 
 def get_combined_img(img, grasp_img):    
     img_shape =  img.shape
     grasp_shape = grasp_img.shape
+
+    img = np.nan_to_num(img, nan=0)
+    grasp_img = np.nan_to_num(grasp_img, nan=0)
 
     if len(img_shape) != 3:
         img = cv2.applyColorMap((img * 255).astype(np.uint8), cv2.COLORMAP_BONE)
