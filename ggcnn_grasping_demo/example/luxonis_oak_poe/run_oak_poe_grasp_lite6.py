@@ -15,8 +15,8 @@ CAM_WIDTH = 640
 CAM_HEIGHT = 400
 DISABLE_RGB = False
 
-MODEL_FILE = 'models/ggcnn_epoch_23_cornell'    # GGCNN
-# MODEL_FILE = 'models/epoch_50_cornell'          # GGCNN2
+MODEL_FILE = os.path.join(os.path.dirname(__file__), '../../models/ggcnn_epoch_23_cornell')    # GGCNN
+# MODEL_FILE = os.path.join(os.path.dirname(__file__), '../../models/epoch_50_cornell')        # GGCNN2
 # use open-loop solution when robot height is over OPEN_LOOP_HEIGHT
 OPEN_LOOP_HEIGHT = 500 # mm
 GGCNN_IN_THREAD = False

@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import cv2
@@ -8,7 +9,7 @@ from skimage.draw import disk
 from skimage.feature import peak_local_max
 import threading
 
-sys.path.append('./ggcnn')
+sys.path.append(os.path.join(os.path.dirname(__file__), '../ggcnn'))
 torch.nn.Module.dump_patches = False
 
 
