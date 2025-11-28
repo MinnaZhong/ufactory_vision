@@ -154,7 +154,7 @@ class RobotGrasp(object):
 
         self.ready_check = True
 
-        while self.arm.connected:
+        while self.arm.connected and self.arm.error_code == 0:
             _, pos = self.arm.get_position()
             self.arm.get_err_warn_code()
             self.CURR_POS = [pos[0], pos[1], pos[2], pos[3], pos[4], pos[5]]
