@@ -106,6 +106,7 @@ class RobotGrasp(object):
         self.gripper_z_mm = grasp_config['GRIPPER_Z_MM']
         self.grasping_min_z = grasp_config['GRASPING_MIN_Z']
         self.use_vacuum_gripper = grasp_config.get('USE_VACUUM_GRIPPER', False)
+        self.lock_rpy = grasp_config.get('LOCK_RPY', False)
         self.min_result_z = grasp_config.get('MIN_RESULT_Z_MM', 200) / 1000
         # self.pose_averager = Averager(4, 3)
         self.pose_averager = MinPos(4, 3)
@@ -309,8 +310,11 @@ class RobotGrasp(object):
         ang = av[3] - np.pi/2  # We don't want to align, we want to grip.
         gp_base = [av[0], av[0], av[0], np.pi, 0, ang]
 
-        GOAL_POS = [av[0] * 1000, av[1] * 1000, av[2] * 1000 + self.gripper_z_mm, 180, 0, math.degrees(ang + np.pi)]
-        if GOAL_POS[2] < self.gripper_z_mm - 10:
+        if self.lock_rpy:
+            GOAL_POS = [av[0] * 1000, av[1] * 1000, av[2] * 1000 + self.gripper_z_mm, 180, 0, 0]
+        else:
+            GOAL_POS = [av[0] * 1000, av[1] * 1000, av[2] * 1000 + self.gripper_z_mm, 180, 0, math.degrees(ang + np.pi)]
+        if GOAL_POS[2] < self.grasping_min_z - 10:
             # print('[IG]', GOAL_POS)
             return
         GOAL_POS[2] = max(GOAL_POS[2], self.grasping_min_z)
@@ -329,13 +333,13 @@ class RobotGrasp(object):
 
         if self.GRASP_STATUS == 0:
             self.GOAL_POS = GOAL_POS
-            z = max(self.GOAL_POS[2] + 100, 350)
+            z = max(self.CURR_POS[2], 380)
             self.arm.set_position(x=self.GOAL_POS[0], y=self.GOAL_POS[1], z=z,
                                   roll=self.GOAL_POS[3], pitch=self.GOAL_POS[4], yaw=self.GOAL_POS[5], 
                                   speed=100, acc=1000, wait=False)
 
         elif self.GRASP_STATUS == 1:
-            z = max(self.GOAL_POS[2] + 100, 350)
+            z = max(self.CURR_POS[2], 380)
             self.GOAL_POS = GOAL_POS
             self.arm.set_position(x=GOAL_POS[0], y=GOAL_POS[1], z=z, roll=GOAL_POS[3], pitch=GOAL_POS[4], yaw=GOAL_POS[5], speed=200, acc=1000, wait=False)
             self.GRASP_STATUS = 2
