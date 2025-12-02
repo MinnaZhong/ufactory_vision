@@ -8,7 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from camera.depthai_camera import DepthAiCamera
 from camera.utils import get_combined_img
 from grasp.ggcnn_torch import TorchGGCNN
-from grasp.robot_grasp_depthai import RobotGrasp
+from grasp.robot_grasp import RobotGrasp
 
 WIN_NAME = 'OAK-POE'
 CAM_WIDTH = 640
@@ -19,7 +19,7 @@ MODEL_FILE = os.path.join(os.path.dirname(__file__), '../../models/ggcnn_epoch_2
 # MODEL_FILE = os.path.join(os.path.dirname(__file__), '../../models/epoch_50_cornell')        # GGCNN2
 # use open-loop solution when robot height is over OPEN_LOOP_HEIGHT
 OPEN_LOOP_HEIGHT = 500 # mm
-GGCNN_IN_THREAD = False
+GGCNN_IN_THREAD = True
 
 # show the grasp image of ggcnn or not, otherwise show native depth images.
 SHOW_GRASP_IMG = False

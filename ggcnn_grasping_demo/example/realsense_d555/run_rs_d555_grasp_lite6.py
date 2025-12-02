@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from camera.rs_camera import RealSenseCamera
 from camera.utils import get_combined_img
 from grasp.ggcnn_torch import TorchGGCNN
-from grasp.robot_grasp import RobotGrasp
+from grasp.robot_grasp_lite6 import RobotGrasp
 
 WIN_NAME = 'RealSense-D555'
 CAM_WIDTH = 640
@@ -31,10 +31,10 @@ EULER_COLOR_TO_DEPTH_OPT = [0, 0, 0, 0, 0, 0]
 
 # The range of motion of the robot grasping
 # If it exceeds the range, it will return to the initial detection position.
-GRASPING_RANGE = [180, 380, -200, 200] # [x_min, x_max, y_min, y_max]
+GRASPING_RANGE = [180, 350, -200, 200] # [x_min, x_max, y_min, y_max]
 
 # initial detection position
-DETECT_XYZ = [200, 0, 320] # [x, y, z]
+DETECT_XYZ = [200, 0, 380] # [x, y, z]
 
 # release grasping pos
 RELEASE_XYZ = [200, 200, 200]
@@ -44,7 +44,7 @@ LIFT_OFFSET_Z = 0 # lift_height = DETECT_XYZ[2] + LIFT_OFFSET_Z
 
 # The distance between the gripping point of the robot grasping and the end of the robot arm flange
 # The value needs to be fine-tuned according to the actual situation.
-GRIPPER_Z_MM = 70 # mm
+GRIPPER_Z_MM = 50 # mm
 
 # minimum z for grasping
 GRASPING_MIN_Z = 70 # mm
