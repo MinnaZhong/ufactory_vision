@@ -3,6 +3,17 @@ import numpy as np
 import depthai as dai
 import cv2
 import math
+from datetime import timedelta
+
+RGB_SOCKET = dai.CameraBoardSocket.CAM_A
+LEFT_SOCKET = dai.CameraBoardSocket.CAM_B
+RIGHT_SOCKET = dai.CameraBoardSocket.CAM_C
+ALIGN_SOCKET = RIGHT_SOCKET
+
+COLOR_RESOLUTION = dai.ColorCameraProperties.SensorResolution.THE_1080_P
+LEFT_RIGHT_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_400_P
+
+ISP_SCALE = 3
 
 
 class DepthAiCamera(object):
@@ -15,116 +26,111 @@ class DepthAiCamera(object):
         # Better handling for occlusions:
         lr_check = True
 
-        # Create pipeline
-        pipeline = dai.Pipeline()
-        self.disable_rgb = disable_rgb
-
-        # Define sources and outputs
-        if not self.disable_rgb:
-            camRgb = pipeline.create(dai.node.ColorCamera)
-            xoutRgb = pipeline.create(dai.node.XLinkOut)
-            xoutRgb.setStreamName("rgb")
-            # Properties
-            camRgb.setPreviewSize(width, height)
-            camRgb.setInterleaved(False)
-            camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.RGB)
-            camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
-            camRgb.setFps(fps)
-            # Linking
-            camRgb.preview.link(xoutRgb.input)
-
-        monoLeft = pipeline.create(dai.node.MonoCamera)
-        monoRight = pipeline.create(dai.node.MonoCamera)
-        depth = pipeline.create(dai.node.StereoDepth)
-        xoutDepth = pipeline.create(dai.node.XLinkOut)
-        xoutDepth.setStreamName("depth")
-        # Properties
-        monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P) # 640*400
-        monoLeft.setFps(fps)
-        monoLeft.setCamera("left")
-        monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P) # 640*400
-        monoRight.setFps(fps)
-        monoRight.setCamera("right")
-
-        # Create a node that will produce the depth map (using disparity output as it's easier to visualize depth this way)
-        depth.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-        # Options: MEDIAN_OFF, KERNEL_3x3, KERNEL_5x5, KERNEL_7x7 (default)
-        depth.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
-        depth.setLeftRightCheck(lr_check)
-        depth.setExtendedDisparity(extended_disparity) 
-        depth.setSubpixel(subpixel)
-        # depth.initialConfig.setDisparityShift(30) #optional: set disparity shift to enhance close observation
-        # depth.initialConfig.setConfidenceThreshold(250)
-        # Linking
-        monoLeft.out.link(depth.left)
-        monoRight.out.link(depth.right)
-        depth.depth.link(xoutDepth.input) # depth unit: mm, max: 65535
-        # print(depth.initialConfig.getMaxDisparity()) # 190.0 if setExtendedDisparity(true)
-
         self.width = width
         self.height = height
-        self.pipeline = pipeline
-        self.depth = depth
-        self.device = dai.Device(self.pipeline)
-        # Output queue will be used to get the disparity frames from the outputs defined above
-        if not self.disable_rgb:
-            self.queRgb = self.device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
-        else:
-            self.queRgb = None
-        self.queDepth = self.device.getOutputQueue(name="depth", maxSize=4, blocking=False)
-    
+        self.disable_rgb = disable_rgb
+
+        self.device = dai.Device()
+
+        self.calibration = self.device.readCalibration2()
+
+        self.rgbIntrinsics = None
+
+        self.rgbDistortion = self.calibration.getDistortionCoefficients(RGB_SOCKET)
+        self.rightDistortion = self.calibration.getDistortionCoefficients(RIGHT_SOCKET)
+        distortionModel = self.calibration.getDistortionModel(RGB_SOCKET)
+        if distortionModel != dai.CameraModel.Perspective:
+            raise RuntimeError("Unsupported distortion model for RGB camera. This example supports only Perspective model.")
+
+        # Create pipeline
+        pipeline = dai.Pipeline()
+
+        # Define sources and outputs
+        cam_rgb = pipeline.create(dai.node.ColorCamera)
+        cam_rgb.setBoardSocket(RGB_SOCKET)
+        cam_rgb.setResolution(COLOR_RESOLUTION)
+        cam_rgb.setFps(fps)
+        cam_rgb.setIspScale(1, ISP_SCALE)
+
+        left = pipeline.create(dai.node.MonoCamera)
+        left.setResolution(LEFT_RIGHT_RESOLUTION) # 640*400
+        left.setFps(fps)
+        left.setCamera("left")
+
+        right = pipeline.create(dai.node.MonoCamera)
+        right.setResolution(LEFT_RIGHT_RESOLUTION) # 640*400
+        right.setFps(fps)
+        right.setCamera("right")
+
+        stereo = pipeline.create(dai.node.StereoDepth)
+        sync = pipeline.create(dai.node.Sync)
+
+        out = pipeline.create(dai.node.XLinkOut)
+        align = pipeline.create(dai.node.ImageAlign)
+
+        # stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+        stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
+        stereo.setLeftRightCheck(lr_check)
+        stereo.setExtendedDisparity(extended_disparity)
+        stereo.setSubpixel(subpixel)
+        stereo.setDepthAlign(ALIGN_SOCKET)
+
+        out.setStreamName("out")
+
+        sync.setSyncThreshold(timedelta(seconds=0.5 / fps))
+
+        # Linking
+        cam_rgb.isp.link(sync.inputs["rgb"])
+        left.out.link(stereo.left)
+        right.out.link(stereo.right)
+        stereo.depth.link(align.input)
+        align.outputAligned.link(sync.inputs["depth_aligned"])
+        cam_rgb.isp.link(align.inputAlignTo)
+        sync.out.link(out.input)
+
+        self.device.startPipeline(pipeline)
+        self.que_out = self.device.getOutputQueue(name="out", maxSize=4, blocking=False)
+
     def __exit__(self):
         self.device.close()
 
-    def get_intrinsics(self):
-        calibData = self.device.readCalibration()
-        # M_rgb, width, height = calibData.getDefaultIntrinsics(dai.CameraBoardSocket.CAM_A)
-        # M_left, width, height = calibData.getDefaultIntrinsics(dai.CameraBoardSocket.CAM_B)
-        # M_Right, width, height = calibData.getDefaultIntrinsics(dai.CameraBoardSocket.CAM_C)
-
-        M_rgb = calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_A, self.width, self.height)
-        M_left = calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_B, self.width, self.height)
-        M_Right = calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_C, self.width, self.height)
-        # M_Right = calibData.getCameraIntrinsics(calibData.getStereoRightCameraId(), self.width, self.height)
-
-        # M_depth = (np.array(M_left) + np.array(M_Right)) / 2
-        M_depth = np.array(M_Right)
-        return np.array(M_rgb), M_depth
-
-        # R1 = np.array(calibData.getStereoLeftRectificationRotation())
-        # R2 = np.array(calibData.getStereoRightRectificationRotation())
-
-        # H_left = np.matmul(np.matmul(M_Right, R1), np.linalg.inv(M_left))
-        # print("LEFT Camera stereo rectification matrix...")
-        # print(H_left)
-
-        # H_right = np.matmul(np.matmul(M_Right, R1), np.linalg.inv(M_Right))
-        # print("RIGHT Camera stereo rectification matrix...")
-        # print(H_right)
-
-    def get_frames(self):
-        if self.queRgb is not None:
-            inRgb = self.queRgb.get()  # blocking call, will wait until a new data has arrived
-            colorFrame = inRgb.getCvFrame()
+    def get_intrinsics(self, width=None, height=None):
+        if width is None or height is None:
+            color_frame, depth_frame = self.get_frames(force=True)
+            rgb_intrinsics = self.calibration.getCameraIntrinsics(RGB_SOCKET, int(color_frame.shape[1]), int(color_frame.shape[0]))
+            # left_intrinsics = self.calibration.getCameraIntrinsics(LEFT_SOCKET, int(depth_frame.shape[1]), int(depth_frame.shape[0]))
+            right_intrinsics = self.calibration.getCameraIntrinsics(RIGHT_SOCKET, int(depth_frame.shape[1]), int(depth_frame.shape[0]))
         else:
-            colorFrame = None
-        inDepth = self.queDepth.get()  # blocking call, will wait until a new data has arrived
-        depthFrame = inDepth.getFrame()
-        # Normalization for better visualization
-        # depthFrame = (depthFrame * (255 / self.depth.initialConfig.getMaxDisparity())).astype(np.uint8) # for better visualization
-        # print(depthFrame) # range 0-65535
-        # cv2.imshow("depth", depthFrame.astype(np.uint8))
-        # Available color maps: https://docs.opencv.org/3.4/d3/d50/group__imgproc__colormap.html
-        # depthFrame = cv2.applyColorMap(depthFrame, cv2.COLORMAP_JET) # input to colorMap must be 0-255
-        # cv2.imshow("disparity_color", depthFrame)
-        return colorFrame, depthFrame
+            rgb_intrinsics = self.calibration.getCameraIntrinsics(RGB_SOCKET, width, height)
+            # left_intrinsics = self.calibration.getCameraIntrinsics(LEFT_SOCKET, width, height)
+            right_intrinsics = self.calibration.getCameraIntrinsics(RIGHT_SOCKET, width, height)
+
+        return np.array(rgb_intrinsics), np.array(right_intrinsics)
+
+    def get_frames(self, force=False):
+        msg_group = self.que_out.get()
+        if not self.disable_rgb or force:
+            color_frame = msg_group["rgb"].getCvFrame()
+        else:
+            color_frame = None
+        depth_frame = msg_group["depth_aligned"].getFrame()
+        return color_frame, depth_frame
     
     def get_images(self):
-        frames = self.get_frames()
-        depth_image = np.asanyarray(frames[1]) * 0.001
+        color_frame, depth_frame = self.get_frames()
+        if color_frame is not None:
+            if self.rgbIntrinsics is None:
+                 self.rgbIntrinsics = self.calibration.getCameraIntrinsics(RGB_SOCKET, int(color_frame.shape[1]), int(color_frame.shape[0]))
+            color_image = cv2.undistort(
+                color_frame,
+                np.array(self.rgbIntrinsics),
+                np.array(self.rgbDistortion),
+            )
+        else:
+            color_image = None
+        depth_image = np.asanyarray(depth_frame) * 0.001
         depth_image[depth_image == 0] = math.nan
-        return frames[0], depth_image
-        # return frames[0], np.asanyarray(frames[1]) * 0.001 # frames[1].astype(np.uint8)
+        return color_image, depth_image
 
 
 if __name__ == '__main__':
@@ -132,14 +138,17 @@ if __name__ == '__main__':
     color_intrin, depth_intrin = cam.get_intrinsics()
     print(color_intrin)
     print(depth_intrin)
+
     fx = depth_intrin[0][0]
-    fy = depth_intrin[0][2]
-    cx = depth_intrin[1][1]
+    fy = depth_intrin[1][1]
+    cx = depth_intrin[0][2]
     cy = depth_intrin[1][2]
     print(fx, fy, cx, cy)
 
     while True:
+        # color_image, depth_image = cam.get_frames()
         color_image, depth_image = cam.get_images()
+        # print('COLOR:', color_image.shape, 'DEPTH:', depth_image.shape)
         if color_image is not None:
             cv2.imshow('COLOR', color_image) # 显示彩色图像
         cv2.imshow('DEPTH', depth_image) # 显示深度图像
