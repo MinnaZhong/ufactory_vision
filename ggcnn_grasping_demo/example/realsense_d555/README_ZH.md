@@ -7,7 +7,7 @@
 - **摄像头**: [Intel RealSense D555](https://realsenseai.com/products/d555-poe/)
 - **POE供电器**: Tenda POE30G-AT, 1000M, 30W (或其他品牌)
 - **摄像头支架**: UFACTORY 提供 (使用 3D 文件进行 3D 打印或 CNC 加工)
-  - 3D 文件下载: [OAK_Camera_Stand.STEP](http://www.ufactory.cc/wp-content/uploads/2025/12/D555_Camera_Stand.zip)
+  - 3D 文件下载: [D555_Camera_Stand.STEP](http://www.ufactory.cc/wp-content/uploads/2025/12/D555_Camera_Stand.zip)
 
 
 ## 850末端网口定义
@@ -72,26 +72,20 @@ source ufactory_vision/bin/activate
 cd ggcnn_grasping_demo/example/realsense_d555
 ```
 
-### 4. 运行实例
+#### 3.1 安装依赖
+```bash
+pip install -r requirements_rs.txt
+```
 
-1.  **安装依赖**
+#### 3.2 运行示例
+将 `192.168.1.xxx` 替换为您的机械臂控制器的实际 IP 地址。
 
+*   **UFACTORY 850 或 xArm 5/6/7 系列机械臂**
     ```bash
-    pip install -r requirements_rs.txt
+    python run_rs_d555_grasp.py 192.168.1.xxx
     ```
 
-2.  **运行示例**
-
-    将 `192.168.1.xxx` 替换为您的机械臂控制器的实际 IP 地址。
-
-    *   **UFACTORY 850 或 xArm 5/6/7 系列机械臂**
-        ```bash
-        python run_rs_d555_grasp.py 192.168.1.xxx
-        ```
-    *   **UFACTORY Lite 6 机械臂**
-        ```bash
-        python run_rs_d555_grasp_lite6.py 192.168.1.xxx
-        ```
+注意：技术上D555和Lite6可以兼容，但其和真空吸头的重量超过Lite6负载范围，不建议在Lite6上使用。
 
 ## 重要提示
 

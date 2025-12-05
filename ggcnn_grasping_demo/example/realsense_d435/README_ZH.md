@@ -1,4 +1,6 @@
 # 基于 Intel Realsense D435 相机的配置
+
+## 硬件要求
 - **机械臂**: [UFACTORY 850、xArm系列、Lite6](https://www.ufactory.cc/ufactory-850/) 
 - **末端执行器**: [UFACTORY xArm 机械爪](https://www.ufactory.cc/product-page/ufactory-xarm-gripper/) 或 [Lite6 真空吸头](https://www.ufactory.cc/product-page/ufactory-lite-6-kit/)
 - **摄像头**: [Intel RealSense D435](https://realsenseai.com/products/stereo-depth-camera-d435/)
@@ -74,13 +76,3 @@ cd ggcnn_grasping_demo/example/realsense_d435
 * **TCP 负载**: 请设置 TCP 负载以避免错误的碰撞检测。
 * **碰撞检测**: 运行示例前，请确保已启用碰撞检测，建议将碰撞灵敏度设置为 3 或更高。
 
-## 许可证
-
-本项目采用 **BSD 3-Clause 许可证**。详情请查看 [LICENSE](LICENSE) 文件。
-
-## 致谢
-
-我们的演示项目基于以下开源项目构建：
-
-- [GGCNN](https://github.com/dougsm/ggcnn)
-- [ggcnn_kinova_grasping](https://github.com/dougsm/ggcnn_kinova_grasping)

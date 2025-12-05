@@ -51,7 +51,12 @@ source ufactory_vision/bin/activate
 cd ggcnn_grasping_demo/example/luxonis_oak_poe
 ```
 
-### 4. 运行示例
+#### 3.1 安装依赖
+```bash
+pip install -r requirements_depthai.txt
+```
+
+#### 3.2 运行示例
 将 `192.168.1.xxx` 替换为您的机械臂控制器的实际 IP 地址。
 
 *   **UFACTORY 850 或 xArm 5/6/7 系列机械臂**
