@@ -24,8 +24,8 @@
 [![Watch the video](assets/realsense_d555.jpg)](https://www.youtube.com/watch?v=c6AeUTJM0QI)
 * xArm6 + Realsense D435 + UFACTORY Gripper G1
 [![Watch the video](assets/realsense_d435.jpg)](https://www.youtube.com/watch?v=ijnuqsNcfUY)
-* Lite6 + Luxonis OAK-D-Pro-PoE + Vacuum Gripper Lite
-[![Watch the video](assets/Luxonis_OAK_D_Pro_PoE.jpg)](https://www.youtube.com/watch?v=1YU0nfNcqYg)
+* Lite6 + Luxonis OAK-D-Pro-PoE + Vacuum Gripper Lite  
+  [![Watch the video](assets/Luxonis_OAK_D_Pro_PoE.jpg)](https://www.youtube.com/watch?v=1YU0nfNcqYg)
 
 ## Important Notes
 
